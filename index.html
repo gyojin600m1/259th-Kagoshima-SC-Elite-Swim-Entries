@@ -227,30 +227,33 @@ sw.forEach(s=>{teamCount[s.sc]=(teamCount[s.sc]||0)+1;});
 const chipsArea=document.getElementById('chipsArea');
 Object.entries(teamCount).sort((a,b)=>b[1]-a[1]).forEach(([t,n])=>{const c=document.createElement('span');c.className='chip';c.textContent=`${t}（${n}）`;c.onclick=()=>quickSearch(t,c);chipsArea.appendChild(c);});
 
-// 種目セレクト（競技順）。性別修正のたびに作り直す
+// 種目セレクト（競技順）。性別修正・男女の絞り込みのたびに作り直す
 let EV={};// 種目ごとの男女別人数 {st,di,f,m}
+// 種目タブの男女の絞り込みで表示する No. と人数
+function evNos(k){const v=EV[k],p=PN[k]||{},g=genderState[2];return [g!=='male'&&v.f&&p.f,g!=='female'&&v.m&&p.m].filter(Boolean);}
+function evCount(k){const v=EV[k],g=genderState[2];return g==='male'?v.m:g==='female'?v.f:v.f+v.m;}
 function buildSelect(){
   const sel=document.getElementById('programSelect');const cur=sel.value;
   const evMap={};
   sw.forEach(s=>s.ev.forEach(e=>{const k=e.st+'_'+e.di;if(!evMap[k])evMap[k]={st:e.st,di:e.di,f:0,m:0};evMap[k][isFemale(s)?'f':'m']++;}));
   EV=evMap;
   sel.length=1;
-  Object.entries(evMap).map(([k,v])=>{const p=PN[k]||{};const nos=[v.f&&p.f,v.m&&p.m].filter(Boolean);return {k,v,nos,first:nos.length?Math.min(...nos):999};})
+  Object.keys(evMap).filter(k=>evCount(k)>0).map(k=>{const nos=evNos(k);return {k,v:evMap[k],nos,first:nos.length?Math.min(...nos):999};})
     .sort((a,b)=>a.first-b.first).forEach(({k,v,nos})=>{
-      const opt=document.createElement('option');opt.value=k;opt.textContent=`No.${nos.join('・')}　${v.di}m ${v.st}（${v.f+v.m}名）`;sel.appendChild(opt);
+      const opt=document.createElement('option');opt.value=k;opt.textContent=`No.${nos.join('・')}　${v.di}m ${v.st}（${evCount(k)}名）`;sel.appendChild(opt);
     });
   sel.value=cur;
-  renderNav();
 }
 
 const genderState={1:'all',2:'all',3:'all'};
 let gradeState='all';
 buildSelect();
+renderNav();
 function setGender(tab,val,el){
   genderState[tab]=val;
   document.getElementById('gf'+tab).querySelectorAll('.gchip').forEach(c=>{c.className='gchip';});
   el.classList.add(val==='all'?'active-all':val==='male'?'active-male':'active-female');
-  if(tab===1)doSearch(null,true);else if(tab===2)searchByProgram();else showRelay();
+  if(tab===1)doSearch(null,true);else if(tab===2){buildSelect();searchByProgram();}else showRelay();
 }
 function setGrade(val,el){gradeState=val;document.querySelectorAll('.grchip').forEach(c=>c.classList.remove('active'));el.classList.add('active');doSearch(null,true);}
 function switchTab(n){
@@ -305,7 +308,7 @@ function fixGender(no){
   doSearch(null,true);
   document.querySelectorAll('#result1 .swimmer-card').forEach(c=>{if(open.has(+c.dataset.no))toggleCard(c.querySelector('.card-header'));});
   buildSelect();
-  if(document.getElementById('programSelect').value)searchByProgram();
+  if(document.getElementById('programSelect').value)searchByProgram();else renderNav();
 }
 
 function searchByProgram(){
@@ -333,17 +336,12 @@ function searchByProgram(){
   container.insertAdjacentHTML('beforeend',`<div class="prog-nav">${navHtml()}</div>`);
 }
 // 前後の種目へ移動する矢印（男女の絞り込みで出場者がいない種目は飛ばす）
-function hasGen(k){const v=EV[k],g=genderState[2];return !!v&&(g==='male'?v.m>0:g==='female'?v.f>0:v.f+v.m>0);}
+// 選択肢は buildSelect で男女の絞り込み済みなので、隣の選択肢がそのまま前後の種目
 function neighbor(step){
-  const sel=document.getElementById('programSelect');
-  for(let i=sel.selectedIndex+step;i>=1&&i<sel.options.length;i+=step){if(hasGen(sel.options[i].value))return i;}
-  return -1;
+  const sel=document.getElementById('programSelect');const i=sel.selectedIndex+step;
+  return i>=1&&i<sel.options.length?i:-1;
 }
-function navLabel(k){
-  const v=EV[k],p=PN[k]||{},g=genderState[2];
-  const nos=[g!=='male'&&v.f&&p.f,g!=='female'&&v.m&&p.m].filter(Boolean);
-  return `No.${nos.join('・')} ${v.di}m ${v.st}`;
-}
+function navLabel(k){const v=EV[k];return `No.${evNos(k).join('・')} ${v.di}m ${v.st}`;}
 function navHtml(){
   const sel=document.getElementById('programSelect');
   const btn=(step,cls,head)=>{const i=neighbor(step);const k=i>0?sel.options[i].value:'';

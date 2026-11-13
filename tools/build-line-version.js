@@ -7,6 +7,8 @@ const path = require('path');
 
 const out = process.argv[2];
 if (!out) { console.error('出力先を指定してください: node tools/build-line-version.js <出力先.html>'); process.exit(1); }
+const SRC = path.resolve(__dirname, '..', 'index.html');
+if (path.resolve(out) === SRC) { console.error('index.html（元ファイル）には書き込めません。別の出力先を指定してください。'); process.exit(1); }
 
 const OVERLAY_CSS = `#overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}
 #overlay-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:360px;width:100%;}
@@ -46,7 +48,8 @@ function insertOnce(html, anchor, text, where) {
   return where === 'before' ? parts[0] + text + anchor + parts[1] : parts[0] + anchor + text + parts[1];
 }
 
-let html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+let html = fs.readFileSync(SRC, 'utf8');
+if (html.includes('id="overlay"')) throw new Error('index.html にすでに開き方の案内が入っています');
 html = insertOnce(html, '</style>', OVERLAY_CSS, 'before');
 html = insertOnce(html, '<div class="header">', OVERLAY_HTML, 'before');
 const tail = '\n</script>\n</body>';
