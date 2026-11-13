@@ -84,6 +84,12 @@ body{font-family:'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Mei
 .stat-num{font-size:22px;font-weight:700;color:var(--accent);text-align:center;}
 .stat-label{font-size:11px;color:var(--text2);margin-top:2px;text-align:center;}
 .notice{font-size:11px;color:var(--text2);line-height:1.7;margin-top:18px;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+.prog-nav{display:flex;gap:8px;margin:10px 0;}
+.nav-btn{flex:1;min-width:0;padding:10px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent;}
+.nav-btn.next{text-align:right;}
+.nav-btn small{display:block;font-size:11px;color:var(--accent);font-weight:700;margin-bottom:2px;}
+.nav-btn span{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.nav-btn:disabled{opacity:.35;cursor:default;}
 </style>
 </head>
 <body>
@@ -147,6 +153,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Mei
     <div class="program-select-wrap">
       <select class="program-select" id="programSelect" onchange="searchByProgram()"><option value="">── 種目を選んでください ──</option></select>
       <button class="program-btn" onclick="searchByProgram()">この種目の出場選手を表示</button>
+      <div class="prog-nav" id="progNavTop"></div>
     </div>
     <div id="statusBar2" class="status-bar" style="display:none"></div>
     <div id="result2">
@@ -233,6 +240,7 @@ function buildSelect(){
   sel.value=cur;
 }
 buildSelect();
+renderNav();
 
 const genderState={1:'all',2:'all',3:'all'};
 let gradeState='all';
@@ -302,6 +310,7 @@ function searchByProgram(){
   const key=document.getElementById('programSelect').value;
   const container=document.getElementById('result2');
   const statusBar=document.getElementById('statusBar2');
+  renderNav();
   if(!key){container.innerHTML='<div class="no-result"><div class="emoji">⚠️</div><p>種目を選んでください</p></div>';statusBar.style.display='none';return;}
   const [st,di]=key.split('_');
   const gen=genderState[2];
@@ -319,6 +328,22 @@ function searchByProgram(){
   if(gen!=='male'&&females.length)block(females,'f');
   if(gen!=='female'&&males.length)block(males,'m');
   if(!container.children.length)container.innerHTML='<div class="no-result"><div class="emoji">😓</div><p>エントリーがありません</p></div>';
+  container.appendChild(navEl());
+}
+// 前後の種目へ移動する矢印
+function progLabel(o){return o?o.textContent.replace(/（\d+名）$/,'').replace('　',' '):'';}
+function navEl(){
+  const sel=document.getElementById('programSelect');const i=sel.selectedIndex,n=sel.options.length;
+  const prev=i>1?sel.options[i-1]:null, next=i<n-1?sel.options[i+1]:null;
+  const d=document.createElement('div');d.className='prog-nav';
+  d.innerHTML=`<button class="nav-btn prev" onclick="goProgram(-1)" ${prev?'':'disabled'}><small>◀ 前の種目</small><span>${prev?esc(progLabel(prev)):'なし'}</span></button><button class="nav-btn next" onclick="goProgram(1)" ${next?'':'disabled'}><small>次の種目 ▶</small><span>${next?esc(progLabel(next)):'なし'}</span></button>`;
+  return d;
+}
+function renderNav(){const t=document.getElementById('progNavTop');t.innerHTML='';t.append(...navEl().childNodes);}
+function goProgram(step){
+  const sel=document.getElementById('programSelect');const i=sel.selectedIndex+step;
+  if(i<1||i>=sel.options.length)return;
+  sel.selectedIndex=i;searchByProgram();window.scrollTo(0,0);
 }
 function makeEntryRow(s,rank){
   const row=document.createElement('div');row.className='entry-row';
