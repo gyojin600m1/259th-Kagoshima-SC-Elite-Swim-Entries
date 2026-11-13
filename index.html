@@ -228,22 +228,24 @@ const chipsArea=document.getElementById('chipsArea');
 Object.entries(teamCount).sort((a,b)=>b[1]-a[1]).forEach(([t,n])=>{const c=document.createElement('span');c.className='chip';c.textContent=`${t}（${n}）`;c.onclick=()=>quickSearch(t,c);chipsArea.appendChild(c);});
 
 // 種目セレクト（競技順）。性別修正のたびに作り直す
+let EV={};// 種目ごとの男女別人数 {st,di,f,m}
 function buildSelect(){
   const sel=document.getElementById('programSelect');const cur=sel.value;
   const evMap={};
   sw.forEach(s=>s.ev.forEach(e=>{const k=e.st+'_'+e.di;if(!evMap[k])evMap[k]={st:e.st,di:e.di,f:0,m:0};evMap[k][isFemale(s)?'f':'m']++;}));
+  EV=evMap;
   sel.length=1;
   Object.entries(evMap).map(([k,v])=>{const p=PN[k]||{};const nos=[v.f&&p.f,v.m&&p.m].filter(Boolean);return {k,v,nos,first:nos.length?Math.min(...nos):999};})
     .sort((a,b)=>a.first-b.first).forEach(({k,v,nos})=>{
       const opt=document.createElement('option');opt.value=k;opt.textContent=`No.${nos.join('・')}　${v.di}m ${v.st}（${v.f+v.m}名）`;sel.appendChild(opt);
     });
   sel.value=cur;
+  renderNav();
 }
-buildSelect();
-renderNav();
 
 const genderState={1:'all',2:'all',3:'all'};
 let gradeState='all';
+buildSelect();
 function setGender(tab,val,el){
   genderState[tab]=val;
   document.getElementById('gf'+tab).querySelectorAll('.gchip').forEach(c=>{c.className='gchip';});
@@ -328,22 +330,30 @@ function searchByProgram(){
   if(gen!=='male'&&females.length)block(females,'f');
   if(gen!=='female'&&males.length)block(males,'m');
   if(!container.children.length)container.innerHTML='<div class="no-result"><div class="emoji">😓</div><p>エントリーがありません</p></div>';
-  container.appendChild(navEl());
+  container.insertAdjacentHTML('beforeend',`<div class="prog-nav">${navHtml()}</div>`);
 }
-// 前後の種目へ移動する矢印
-function progLabel(o){return o?o.textContent.replace(/（\d+名）$/,'').replace('　',' '):'';}
-function navEl(){
-  const sel=document.getElementById('programSelect');const i=sel.selectedIndex,n=sel.options.length;
-  const prev=i>1?sel.options[i-1]:null, next=i<n-1?sel.options[i+1]:null;
-  const d=document.createElement('div');d.className='prog-nav';
-  d.innerHTML=`<button class="nav-btn prev" onclick="goProgram(-1)" ${prev?'':'disabled'}><small>◀ 前の種目</small><span>${prev?esc(progLabel(prev)):'なし'}</span></button><button class="nav-btn next" onclick="goProgram(1)" ${next?'':'disabled'}><small>次の種目 ▶</small><span>${next?esc(progLabel(next)):'なし'}</span></button>`;
-  return d;
+// 前後の種目へ移動する矢印（男女の絞り込みで出場者がいない種目は飛ばす）
+function hasGen(k){const v=EV[k],g=genderState[2];return !!v&&(g==='male'?v.m>0:g==='female'?v.f>0:v.f+v.m>0);}
+function neighbor(step){
+  const sel=document.getElementById('programSelect');
+  for(let i=sel.selectedIndex+step;i>=1&&i<sel.options.length;i+=step){if(hasGen(sel.options[i].value))return i;}
+  return -1;
 }
-function renderNav(){const t=document.getElementById('progNavTop');t.innerHTML='';t.append(...navEl().childNodes);}
+function navLabel(k){
+  const v=EV[k],p=PN[k]||{},g=genderState[2];
+  const nos=[g!=='male'&&v.f&&p.f,g!=='female'&&v.m&&p.m].filter(Boolean);
+  return `No.${nos.join('・')} ${v.di}m ${v.st}`;
+}
+function navHtml(){
+  const sel=document.getElementById('programSelect');
+  const btn=(step,cls,head)=>{const i=neighbor(step);const k=i>0?sel.options[i].value:'';
+    return `<button class="nav-btn ${cls}" onclick="goProgram(${step})" ${k?'':'disabled'}><small>${head}</small><span>${k?esc(navLabel(k)):'なし'}</span></button>`;};
+  return btn(-1,'prev','◀ 前の種目')+btn(1,'next','次の種目 ▶');
+}
+function renderNav(){document.getElementById('progNavTop').innerHTML=navHtml();}
 function goProgram(step){
-  const sel=document.getElementById('programSelect');const i=sel.selectedIndex+step;
-  if(i<1||i>=sel.options.length)return;
-  sel.selectedIndex=i;searchByProgram();window.scrollTo(0,0);
+  const i=neighbor(step);if(i<0)return;
+  document.getElementById('programSelect').selectedIndex=i;searchByProgram();window.scrollTo(0,0);
 }
 function makeEntryRow(s,rank){
   const row=document.createElement('div');row.className='entry-row';
